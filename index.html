@@ -402,7 +402,9 @@ function processarDados(data) {
 
     // 5. Progresso da apuração
     // No JSON do TSE, os dados estão dentro de data.s
-    const pctApurado = Number(data.s?.pst) || 0;
+const pctApurado = parseFloat(
+    String(data.s?.pst ?? "0").replace(",", ".")
+) || 0;
 
     document.getElementById("label-progress").innerText =
         `${pctApurado.toFixed(2)}% Apurado`;
