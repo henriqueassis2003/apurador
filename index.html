@@ -516,7 +516,7 @@ const pctApurado = parseFloat(
       // Modelo de Transição Sigmoide baseado no desvio da proporção necessária em relação ao ritmo atual
       const diferenca = ritmoA - proporcaoNecessaria;
       const z = diferenca * Math.sqrt(Math.max(1, votosRestantes) / 10000);
-      const prob = 1 / (1 + Math.exp(-z * 0.35));
+      const prob = 1 / (1 + Math.exp(-z * 0.0135));
 
       return Math.min(Math.max(prob * 100, 0.1), 99.9);
     }
