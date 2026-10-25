@@ -655,7 +655,7 @@ function processarDados(data) {
         return;
     }
 
-    // 2. Extrair votos e percentuais
+  // 2. Extrair votos e percentuais reais
     const vLula = Number(candLula.vap) || 0;
     const vFlavio = Number(candFlavio.vap) || 0;
     const totalValidos = vLula + vFlavio;
@@ -663,41 +663,36 @@ function processarDados(data) {
     const pctLula = totalValidos > 0 ? (vLula / totalValidos) * 100 : 0;
     const pctFlavio = totalValidos > 0 ? (vFlavio / totalValidos) * 100 : 0;
 
-    // 3. Definir a ordem baseada em quem tem MAIS VOTOS
-    // Se o Flávio tiver mais votos, invertemos a ordem de exibição no topo
-    const lulaLidera = vLula >= vFlavio;
+    // 3. Determinar qual é o maior e o menor percentual/voto
+    const maiorVoto = Math.max(vLula, vFlavio);
+    const menorVoto = Math.min(vLula, vFlavio);
+    const maiorPct = Math.max(pctLula, pctFlavio);
+    const menorPct = Math.min(pctLula, pctFlavio);
 
-    const primeiro = lulaLidera 
-        ? { nome: "Lula", foto: "L.jpg", votos: vLula, pct: pctLula, classe: "lula" }
-        : { nome: "Flávio Bolsonaro", foto: "B.jpg", votos: vFlavio, pct: pctFlavio, classe: "flavio" };
+    // Quem tiver mais votos fica com o valor MAIOR na esquerda (cartão do Lula)
+    // e o menor fica na direita (cartão do Flávio)
+    const votosEsquerda = maiorVoto;
+    const pctEsquerda = maiorPct;
 
-    const segundo = lulaLidera 
-        ? { nome: "Flávio Bolsonaro", foto: "B.jpg", votos: vFlavio, pct: pctFlavio, classe: "flavio" }
-        : { nome: "Lula", foto: "L.jpg", votos: vLula, pct: pctLula, classe: "lula" };
+    const votosDireita = menorVoto;
+    const pctDireita = menorPct;
 
-    // 4. Atualizar o HTML dos candidatos mantendo o líder sempre à esquerda
-    const header = document.querySelector(".candidates-header");
-    if (header) {
-        header.innerHTML = `
-          <div class="candidate ${primeiro.classe}">
-            <img src="${primeiro.foto}" alt="${primeiro.nome}" />
-            <div class="candidate-name">${primeiro.nome}</div>
-            <div class="vote-percent">${primeiro.pct.toFixed(2)}%</div>
-            <div class="vote-count">${primeiro.votos.toLocaleString("pt-BR")} votos</div>
-          </div>
+    // 4. Atualizar a interface com os valores ajustados
+    document.getElementById("votes-lula").innerText =
+        `${votosEsquerda.toLocaleString("pt-BR")} votos`;
 
-          <div class="candidate ${segundo.classe}">
-            <img src="${segundo.foto}" alt="${segundo.nome}" />
-            <div class="candidate-name">${segundo.nome}</div>
-            <div class="vote-percent">${segundo.pct.toFixed(2)}%</div>
-            <div class="vote-count">${segundo.votos.toLocaleString("pt-BR")} votos</div>
-          </div>
-        `;
-    }
+    document.getElementById("pct-lula").innerText =
+        `${pctEsquerda.toFixed(2)}%`;
 
-    // 5. Atualizar a barra de percentual de votos válidos
-    document.getElementById("bar-votes-lula").style.width = `${pctLula}%`;
-    document.getElementById("bar-votes-flavio").style.width = `${pctFlavio}%`;
+    document.getElementById("votes-flavio").innerText =
+        `${votosDireita.toLocaleString("pt-BR")} votos`;
+
+    document.getElementById("pct-flavio").innerText =
+        `${pctDireita.toFixed(2)}%`;
+
+    // Ajustar as barras de progresso para corresponder aos lados
+    document.getElementById("bar-votes-lula").style.width = `${pctEsquerda}%`;
+    document.getElementById("bar-votes-flavio").style.width = `${pctDireita}%`;
 
     // 6. Progresso da apuração
     const pctApurado = parseFloat(String(data.s?.pst ?? "0").replace(",", ".")) || 0;
