@@ -655,7 +655,7 @@ function processarDados(data) {
         return;
     }
 
-  // 2. Extrair votos e percentuais reais
+    // 2. Extrair votos e percentuais reais
     const vLula = Number(candLula.vap) || 0;
     const vFlavio = Number(candFlavio.vap) || 0;
     const totalValidos = vLula + vFlavio;
@@ -663,41 +663,51 @@ function processarDados(data) {
     const pctLula = totalValidos > 0 ? (vLula / totalValidos) * 100 : 0;
     const pctFlavio = totalValidos > 0 ? (vFlavio / totalValidos) * 100 : 0;
 
-    // 3. Determinar qual é o maior e o menor percentual/voto
-    const maiorVoto = Math.max(vLula, vFlavio);
-    const menorVoto = Math.min(vLula, vFlavio);
-    const maiorPct = Math.max(pctLula, pctFlavio);
-    const menorPct = Math.min(pctLula, pctFlavio);
+    // 3. Definir quem fica à esquerda (quem tiver mais votos lidera)
+    const lulaLidera = vLula >= vFlavio;
 
-    // Quem tiver mais votos fica com o valor MAIOR na esquerda (cartão do Lula)
-    // e o menor fica na direita (cartão do Flávio)
-    const votosEsquerda = maiorVoto;
-    const pctEsquerda = maiorPct;
+    const primeiro = lulaLidera 
+        ? { nome: "Lula", foto: "L.jpg", votos: vLula, pct: pctLula, classe: "lula", barClass: "bar-votes-lula" }
+        : { nome: "Flávio Bolsonaro", foto: "B.jpg", votos: vFlavio, pct: pctFlavio, classe: "flavio", barClass: "bar-votes-flavio" };
 
-    const votosDireita = menorVoto;
-    const pctDireita = menorPct;
+    const segundo = lulaLidera 
+        ? { nome: "Flávio Bolsonaro", foto: "B.jpg", votos: vFlavio, pct: pctFlavio, classe: "flavio", barClass: "bar-votes-flavio" }
+        : { nome: "Lula", foto: "L.jpg", votos: vLula, pct: pctLula, classe: "lula", barClass: "bar-votes-lula" };
 
-    // 4. Atualizar a interface com os valores ajustados
-    document.getElementById("votes-lula").innerText =
-        `${votosEsquerda.toLocaleString("pt-BR")} votos`;
+    // 4. Reescrever o cabeço no HTML para trocar a ordem visualmente
+    const headerHtml = document.querySelector(".candidates-header");
+    if (headerHtml) {
+        headerHtml.innerHTML = `
+          <div class="candidate ${primeiro.classe}">
+            <img src="${primeiro.foto}" alt="${primeiro.nome}" />
+            <div class="candidate-name">${primeiro.nome}</div>
+            <div class="vote-percent">${primeiro.pct.toFixed(2)}%</div>
+            <div class="vote-count">${primeiro.votos.toLocaleString("pt-BR")} votos</div>
+          </div>
 
-    document.getElementById("pct-lula").innerText =
-        `${pctEsquerda.toFixed(2)}%`;
+          <div class="candidate ${segundo.classe}">
+            <img src="${segundo.foto}" alt="${segundo.nome}" />
+            <div class="candidate-name">${segundo.nome}</div>
+            <div class="vote-percent">${segundo.pct.toFixed(2)}%</div>
+            <div class="vote-count">${segundo.votos.toLocaleString("pt-BR")} votos</div>
+          </div>
+        `;
+    }
 
-    document.getElementById("votes-flavio").innerText =
-        `${votosDireita.toLocaleString("pt-BR")} votos`;
-
-    document.getElementById("pct-flavio").innerText =
-        `${pctDireita.toFixed(2)}%`;
-
-    // Ajustar as barras de progresso para corresponder aos lados
-    document.getElementById("bar-votes-lula").style.width = `${pctEsquerda}%`;
-    document.getElementById("bar-votes-flavio").style.width = `${pctDireita}%`;
+    // 5. Atualizar as barras de votos proporcionalmente
+    const barLulaEl = document.getElementById("bar-votes-lula");
+    const barFlavioEl = document.getElementById("bar-votes-flavio");
+    if (barLulaEl && barFlavioEl) {
+        barLulaEl.style.width = `${pctLula}%`;
+        barFlavioEl.style.width = `${pctFlavio}%`;
+    }
 
     // 6. Progresso da apuração
     const pctApurado = parseFloat(String(data.s?.pst ?? "0").replace(",", ".")) || 0;
-    document.getElementById("label-progress").innerText = `${pctApurado.toFixed(2)}% Apurado`;
-    document.getElementById("bar-progress").style.width = `${Math.min(100, Math.max(0, pctApurado))}%`;
+    const labelProgress = document.getElementById("label-progress");
+    const barProgress = document.getElementById("bar-progress");
+    if (labelProgress) labelProgress.innerText = `${pctApurado.toFixed(2)}% Apurado`;
+    if (barProgress) barProgress.style.width = `${Math.min(100, Math.max(0, pctApurado))}%`;
 
     // 7. Atualizar o modelo e probabilidades
     dadosNacional = processarDadosEstado("BR", "Brasil", data);
@@ -713,15 +723,22 @@ function processarDados(data) {
     const pctValidos = totalApuradoGeral > 0 ? (totalValidos / totalApuradoGeral) * 100 : 0;
     const pctInvalidos = totalApuradoGeral > 0 ? (demaisEstimados / totalApuradoGeral) * 100 : 0;
 
-    document.getElementById("bar-valid").style.width = `${pctValidos}%`;
-    document.getElementById("bar-invalid").style.width = `${pctInvalidos}%`;
-    document.getElementById("label-valid").innerText = `Válidos: ${pctValidos.toFixed(1)}%`;
-    document.getElementById("label-invalid").innerText = `Nulos/Brancos/Abst.: ${pctInvalidos.toFixed(1)}%`;
+    const barValid = document.getElementById("bar-valid");
+    const barInvalid = document.getElementById("bar-invalid");
+    const labelValid = document.getElementById("label-valid");
+    const labelInvalid = document.getElementById("label-invalid");
+
+    if (barValid) barValid.style.width = `${pctValidos}%`;
+    if (barInvalid) barInvalid.style.width = `${pctInvalidos}%`;
+    if (labelValid) labelValid.innerText = `Válidos: ${pctValidos.toFixed(1)}%`;
+    if (labelInvalid) labelInvalid.innerText = `Nulos/Brancos/Abst.: ${pctInvalidos.toFixed(1)}%`;
 
     // 9. Atualizar horário
     const agora = new Date().toLocaleTimeString("pt-BR");
-    document.getElementById("last-update").innerText =
-        `Última consulta: ${agora} (atualização automática a cada 2 minutos)`;
+    const lastUpdate = document.getElementById("last-update");
+    if (lastUpdate) {
+        lastUpdate.innerText = `Última consulta: ${agora} (atualização automática a cada 2 minutos)`;
+    }
 }
 
 
