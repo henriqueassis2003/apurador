@@ -208,6 +208,84 @@
       color: var(--text-muted);
     }
 
+
+    /* Tabela de ranking ao vivo das 27 UFs */
+    .ranking-section {
+      overflow: hidden;
+    }
+
+    .ranking-subtitle {
+      color: var(--text-muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+      margin: -5px 0 14px;
+    }
+
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 8px;
+    }
+
+    .uf-table {
+      width: 100%;
+      min-width: 1050px;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .uf-table th,
+    .uf-table td {
+      padding: 10px 9px;
+      border-bottom: 1px solid #383838;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .uf-table th {
+      background: #292929;
+      color: #eeeeee;
+      font-weight: 650;
+      position: sticky;
+      top: 0;
+    }
+
+    .uf-table th:first-child,
+    .uf-table td:first-child,
+    .uf-table th:nth-child(2),
+    .uf-table td:nth-child(2) {
+      text-align: left;
+    }
+
+    .uf-table tbody tr:hover {
+      background: #303030;
+    }
+
+    .uf-table .uf-name {
+      font-weight: 700;
+    }
+
+    .uf-table .lula-cell {
+      color: #ff7777;
+    }
+
+    .uf-table .flavio-cell {
+      color: #75b8ff;
+    }
+
+    .uf-table .pending-cell {
+      font-weight: 700;
+      color: #ffe082;
+    }
+
+    .ranking-status {
+      margin-top: 12px;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
     /* Rodapé com Aviso e Status */
     .footer-status {
       text-align: center;
@@ -311,11 +389,37 @@
 
     </div>
 
-    <!-- Ranking dos 5 Estados com mais Votos Pendentes -->
+    <!-- Ranking ao vivo das 27 UFs -->
     <div class="ranking-section">
-      <div class="ranking-title">Top 5 Estados com Mais Votos a Apurar</div>
-      <div id="ranking-list">
-        <!-- Renderizado dinamicamente via JS -->
+      <div class="ranking-title">Ranking ao vivo — 27 UFs com mais votos estimados a apurar</div>
+      <div class="ranking-subtitle">
+        Ordenado pela estimativa absoluta de votos ainda a apurar.
+        Lula e Flávio: percentual dos votos válidos apurados na UF. Válidos, abstenção, brancos e nulos:
+        percentual do eleitorado estadual. Os votos restantes são estimados a partir do eleitorado, do percentual de seções totalizadas e do comparecimento observado.
+      </div>
+      <div class="table-scroll">
+        <table class="uf-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>UF</th>
+              <th>Lula (% válidos)</th>
+              <th>Flávio (% válidos)</th>
+              <th>Votos válidos (% eleitorado)</th>
+              <th>Abstenção (%)</th>
+              <th>Brancos (%)</th>
+              <th>Nulos (%)</th>
+              <th>Apuração (%)</th>
+              <th>Votos a apurar (estim.)</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-list">
+            <tr><td colspan="10" style="text-align:center;color:#aaa;">Carregando dados das UFs do TSE…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="ranking-status" id="ranking-status">
+        Aguardando os dados estaduais do TSE…
       </div>
     </div>
 
@@ -333,17 +437,175 @@
     // URL do endpoint de dados do TSE
     const TSE_API_URL = "https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json";
 
+    const UFS_BR = [
+      ["AC", "Acre"], ["AL", "Alagoas"], ["AP", "Amapá"], ["AM", "Amazonas"],
+      ["BA", "Bahia"], ["CE", "Ceará"], ["DF", "Distrito Federal"], ["ES", "Espírito Santo"],
+      ["GO", "Goiás"], ["MA", "Maranhão"], ["MT", "Mato Grosso"], ["MS", "Mato Grosso do Sul"],
+      ["MG", "Minas Gerais"], ["PA", "Pará"], ["PB", "Paraíba"], ["PR", "Paraná"],
+      ["PE", "Pernambuco"], ["PI", "Piauí"], ["RJ", "Rio de Janeiro"], ["RN", "Rio Grande do Norte"],
+      ["RS", "Rio Grande do Sul"], ["RO", "Rondônia"], ["RR", "Roraima"], ["SC", "Santa Catarina"],
+      ["SP", "São Paulo"], ["SE", "Sergipe"], ["TO", "Tocantins"]
+    ];
+
+    const TSE_BASE = "https://resultados.tse.jus.br/oficial/ele2026/6258/dados";
+
     async function buscarDadosEAtualizar() {
+      const tarefas = [
+        buscarDadosNacionais(),
+        buscarDadosEstados()
+      ];
+      await Promise.allSettled(tarefas);
+    }
+
+    async function buscarDadosNacionais() {
       try {
         const response = await fetch(TSE_API_URL, { cache: "no-store" });
-        if (!response.ok) throw new Error("Erro na rede ou API indisponível");
+        if (!response.ok) throw new Error(`TSE nacional respondeu HTTP ${response.status}`);
         const data = await response.json();
-
         processarDados(data);
       } catch (error) {
-        console.warn("Não foi possível carregar dados reais do TSE no momento.", error);
-        document.getElementById('last-update').innerText = "Aguardando transmissão de dados oficiais do TSE...";
+        console.warn("Não foi possível carregar os dados nacionais do TSE.", error);
+        document.getElementById("last-update").innerText =
+          "Não foi possível atualizar os dados nacionais; tentando novamente automaticamente.";
       }
+    }
+
+    async function buscarDadosEstados() {
+      const corpo = document.getElementById("ranking-list");
+      const status = document.getElementById("ranking-status");
+      status.textContent = "Consultando os 27 arquivos estaduais do TSE…";
+
+      const resultados = await Promise.allSettled(
+        UFS_BR.map(async ([sigla, nome]) => {
+          const uf = sigla.toLowerCase();
+          const url = `${TSE_BASE}/${uf}/${uf}-c0001-e006258-u.json`;
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error(`${sigla}: HTTP ${response.status}`);
+          const data = await response.json();
+          return processarDadosEstado(sigla, nome, data);
+        })
+      );
+
+      const estados = [];
+      const falhas = [];
+      resultados.forEach((resultado, indice) => {
+        if (resultado.status === "fulfilled" && resultado.value) {
+          estados.push(resultado.value);
+        } else {
+          falhas.push(UFS_BR[indice][0]);
+          if (resultado.status === "rejected") {
+            console.warn(`Falha ao carregar dados da UF ${UFS_BR[indice][0]}.`, resultado.reason);
+          }
+        }
+      });
+
+      estados.sort((a, b) => b.votosRestantes - a.votosRestantes);
+      if (estados.length) {
+        corpo.innerHTML = estados.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td class="uf-name" title="${escapeHtml(e.nome)}">${e.sigla}</td>
+            <td class="lula-cell">${formatarPct(e.pctLula)}</td>
+            <td class="flavio-cell">${formatarPct(e.pctFlavio)}</td>
+            <td>${formatarPct(e.pctValidosEleitorado)}</td>
+            <td>${formatarPct(e.pctAbstencao)}</td>
+            <td>${formatarPct(e.pctBrancos)}</td>
+            <td>${formatarPct(e.pctNulos)}</td>
+            <td>${formatarPct(e.pctApurado)}</td>
+            <td class="pending-cell">${formatarNumero(e.votosRestantes)}</td>
+          </tr>
+        `).join("");
+      } else {
+        corpo.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#ff8a80;">
+          Não foi possível carregar os arquivos estaduais. Confira a conexão e tente novamente.
+        </td></tr>`;
+      }
+
+      const agora = new Date().toLocaleTimeString("pt-BR");
+      status.textContent = `UFs carregadas: ${estados.length}/27. Última consulta estadual: ${agora}.` +
+        (falhas.length ? ` Sem resposta: ${falhas.join(", ")}.` : "") +
+        " Estimativa de votos restantes = eleitorado estimado nas seções pendentes × taxa de comparecimento observada.";
+    }
+
+    function processarDadosEstado(sigla, nome, data) {
+      const candidatos = (data.carg ?? [])
+        .flatMap(cargo => cargo.agr ?? [])
+        .flatMap(agrupamento => agrupamento.par ?? [])
+        .flatMap(partido => partido.cand ?? []);
+
+      const normalizar = texto => String(texto ?? "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+      // Usa o nome como primeira opção; seq é fallback para manter compatibilidade com o arquivo original.
+      const candLula = candidatos.find(c => normalizar(c.nm).includes("LULA")) ||
+        candidatos.find(c => String(c.seq) === "1");
+      const candFlavio = candidatos.find(c => normalizar(c.nm).includes("FLAVIO") && normalizar(c.nm).includes("BOLSONARO")) ||
+        candidatos.find(c => String(c.seq) === "2");
+
+      const numero = value => {
+        if (value === null || value === undefined || value === "") return null;
+        const n = Number(String(value).replace(",", "."));
+        return Number.isFinite(n) ? n : null;
+      };
+      const firstNumber = (...values) => {
+        for (const value of values) {
+          const n = numero(value);
+          if (n !== null) return n;
+        }
+        return 0;
+      };
+
+      const votosLula = firstNumber(candLula?.vap, candLula?.v);
+      const votosFlavio = firstNumber(candFlavio?.vap, candFlavio?.v);
+      const votosValidosCandidatos = votosLula + votosFlavio;
+      const eleitorado = firstNumber(data.e?.te, data.e?.eleitorado);
+      const pctApurado = firstNumber(data.s?.pst, data.e?.pe, data.pst);
+      const abstencao = firstNumber(data.e?.a, data.e?.ab, data.e?.abst);
+      const brancos = firstNumber(data.e?.vb, data.e?.vbr, data.e?.brancos);
+      const nulos = firstNumber(data.e?.vn, data.e?.vnu, data.e?.nulos);
+      const validosTotal = firstNumber(data.e?.v, data.e?.vv, data.e?.validos) || votosValidosCandidatos;
+      const comparecimento = firstNumber(data.e?.c, data.e?.comp, data.e?.comparecimento) ||
+        (validosTotal + brancos + nulos);
+
+      const pctLula = votosValidosCandidatos > 0 ? votosLula / votosValidosCandidatos * 100 : 0;
+      const pctFlavio = votosValidosCandidatos > 0 ? votosFlavio / votosValidosCandidatos * 100 : 0;
+      const pctValidosEleitorado = eleitorado > 0 ? validosTotal / eleitorado * 100 : 0;
+      const pctAbstencao = eleitorado > 0 ? abstencao / eleitorado * 100 : 0;
+      const pctBrancos = eleitorado > 0 ? brancos / eleitorado * 100 : 0;
+      const pctNulos = eleitorado > 0 ? nulos / eleitorado * 100 : 0;
+
+      // O arquivo agregado não informa exatamente quantos votos faltam em cada UF.
+      // Aproximação: eleitorado proporcional às seções pendentes × taxa de comparecimento
+      // observada nas seções já totalizadas. A estimativa não é uma contagem oficial.
+      const fracaoApurada = Math.min(1, Math.max(0, pctApurado / 100));
+      const eleitoresNasSecoesApuradas = eleitorado * fracaoApurada;
+      const eleitoresRestantes = Math.max(0, eleitorado - eleitoresNasSecoesApuradas);
+      const taxaComparecimento = eleitoresNasSecoesApuradas > 0
+        ? Math.min(1, Math.max(0, comparecimento / eleitoresNasSecoesApuradas))
+        : 0;
+      const votosRestantes = eleitoresRestantes * taxaComparecimento;
+
+      return {
+        sigla, nome, votosLula, votosFlavio, eleitorado, pctApurado, abstencao, brancos, nulos,
+        validosTotal, comparecimento, pctLula, pctFlavio, pctValidosEleitorado,
+        pctAbstencao, pctBrancos, pctNulos, eleitoresRestantes, votosRestantes
+      };
+    }
+
+    function formatarNumero(valor) {
+      return Math.round(Number(valor) || 0).toLocaleString("pt-BR");
+    }
+
+    function formatarPct(valor) {
+      return `${(Number(valor) || 0).toLocaleString("pt-BR", {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+      })}%`;
+    }
+
+    function escapeHtml(texto) {
+      return String(texto ?? "").replace(/[&<>"']/g, caractere => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[caractere]);
     }
 
 
