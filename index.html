@@ -1,800 +1,445 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Eleitoral em Tempo Real & Probabilidade Bayesiana</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        lula: '#DC2626',      /* Vermelho */
-                        flavio: '#2563EB',    /* Azul */
-                        valid: '#16A34A',     /* Verde */
-                        invalid: '#EAB308',   /* Amarelo */
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #070a12;
-            color: #f3f4f6;
-        }
-        /* Custom smooth transition for engine bars */
-        .bar-transition {
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
-        }
-        .glow-red {
-            box-shadow: 0 0 25px rgba(220, 38, 38, 0.35);
-        }
-        .glow-blue {
-            box-shadow: 0 0 25px rgba(37, 99, 235, 0.35);
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apuração Eleitoral em Tempo Real</title>
+  <style>
+    :root {
+      --lula-color: #d32f2f;
+      --flavio-color: #1976d2;
+      --valid-color: #388e3c;
+      --invalid-color: #fbc02d;
+      --bg-dark: #121212;
+      --card-bg: #1e1e1e;
+      --text-main: #ffffff;
+      --text-muted: #aaaaaa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px 10px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Topo: Perfis dos Candidatos */
+    .candidates-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .candidate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 45%;
+      text-align: center;
+    }
+
+    .candidate img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #333;
+      margin-bottom: 10px;
+    }
+
+    .candidate.lula img {
+      border-color: var(--lula-color);
+    }
+
+    .candidate.flavio img {
+      border-color: var(--flavio-color);
+    }
+
+    .candidate-name {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .vote-count {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .vote-percent {
+      font-size: 1.6rem;
+      font-weight: bold;
+    }
+
+    /* Seção de Barras */
+    .bars-section {
+      background-color: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .bar-container {
+      height: 28px;
+      width: 100%;
+      background-color: #333;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      position: relative;
+    }
+
+    /* Barra 1: Percentual de Votos */
+    .bar-votes-lula {
+      background-color: var(--lula-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+    .bar-votes-flavio {
+      background-color: var(--flavio-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+
+    /* Barra 2: Probabilidade de Vitória */
+    .bar-prob-lula {
+      background-color: var(--lula-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+    .bar-prob-flavio {
+      background-color: var(--flavio-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+
+    /* Barra 3: Progresso de Apuração */
+    .bar-progress-filled {
+      background-color: #ffffff;
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+
+    /* Barra 4: Válidos x Nulos/Brancos/Abstenção */
+    .bar-valid {
+      background-color: var(--valid-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+    .bar-invalid {
+      background-color: var(--invalid-color);
+      height: 100%;
+      transition: width 0.5s ease;
+    }
+
+    /* Ranking dos Estados */
+    .ranking-section {
+      background-color: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .ranking-title {
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+    }
+
+    .state-card {
+      background-color: #2a2a2a;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .state-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+    }
+
+    .state-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Rodapé com Aviso e Status */
+    .footer-status {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .disclaimer {
+      font-style: italic;
+      color: #e57373;
+    }
+
+    @media (max-width: 600px) {
+      .candidate img {
+        width: 75px;
+        height: 75px;
+      }
+      .vote-percent {
+        font-size: 1.3rem;
+      }
+      .state-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-red-500 selection:text-white pb-10">
+<body>
 
-    <!-- Header / Navbar -->
-    <header class="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur sticky top-0 z-50 px-4 py-3">
-        <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-red-600/20 text-red-500 rounded-lg border border-red-500/30">
-                    <i data-lucide="vote" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg md:text-xl tracking-tight text-white flex items-center gap-2">
-                        Apuração Eleitoral 
-                        <span id="live-indicator" class="text-xs bg-red-600/30 text-red-400 border border-red-500/40 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider flex items-center gap-1">
-                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Ao Vivo
-                        </span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Modelo Bayesiano Dinâmico com Apuração em Tempo Real</p>
-                </div>
-            </div>
-            
-            <!-- Controls Trigger -->
-            <div class="flex items-center gap-2">
-                <button id="btn-toggle-config" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs md:text-sm px-3 py-2 rounded-lg border border-slate-700 transition">
-                    <i data-lucide="settings" class="w-4 h-4"></i>
-                    <span class="hidden md:inline">Fonte de Dados</span>
-                </button>
-            </div>
+  <div class="container">
+    
+    <!-- Topo com Candidatos -->
+    <div class="candidates-header">
+      <div class="candidate lula">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/9/9f/Lula_-_foto_oficial_05_jan_2023_%28cropped%29.jpg" alt="Lula" />
+        <div class="candidate-name">Lula</div>
+        <div class="vote-percent" id="pct-lula">0.00%</div>
+        <div class="vote-count" id="votes-lula">0 votos</div>
+      </div>
+
+      <div class="candidate flavio">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Fl%C3%A1vio_Bolsonaro_foto_oficial.jpg/800px-Fl%C3%A1vio_Bolsonaro_foto_oficial.jpg" alt="Flávio Bolsonaro" />
+        <div class="candidate-name">Flávio Bolsonaro</div>
+        <div class="vote-percent" id="pct-flavio">0.00%</div>
+        <div class="vote-count" id="votes-flavio">0 votos</div>
+      </div>
+    </div>
+
+    <!-- Seção das 4 Barras -->
+    <div class="bars-section">
+      
+      <!-- Barra 1: Percentual de Votos -->
+      <div class="bar-group">
+        <div class="bar-label">
+          <span>Votos Válidos (Lula)</span>
+          <span>Votos Válidos (Flávio)</span>
         </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto w-full px-4 pt-6 space-y-6 flex-1">
-
-        <!-- Panel Configuration & TSE Live Connect (Collapsible) -->
-        <section id="config-panel" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 md:p-6 transition-all shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                    <i data-lucide="database" class="w-4 h-4 text-blue-400"></i> Entrada de Dados da Apuração
-                </h3>
-                <span id="data-source-badge" class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">Feed Dinâmico Ao Vivo</span>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Data Mode Switcher -->
-                <div class="space-y-2">
-                    <label class="text-xs font-medium text-slate-400">Modo de Operação</label>
-                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-lg border border-slate-800">
-                        <button id="mode-sim" onclick="setMode('sim')" class="py-2 px-3 text-xs font-medium rounded-md bg-slate-800 text-white shadow">Alimentador Ao Vivo</button>
-                        <button id="mode-tse" onclick="setMode('tse')" class="py-2 px-3 text-xs font-medium rounded-md text-slate-400 hover:text-white">API TSE / Polling</button>
-                    </div>
-                </div>
-
-                <!-- Simulation Speed -->
-                <div id="sim-controls" class="space-y-2">
-                    <label class="text-xs font-medium text-slate-400 flex justify-between">
-                        <span>Velocidade de Entrada dos Votos</span>
-                        <span id="speed-val" class="text-blue-400 font-mono">1.0x</span>
-                    </label>
-                    <input id="sim-speed" type="range" min="0.5" max="5" step="0.5" value="1" class="w-full accent-blue-500 bg-slate-950 rounded-lg cursor-pointer h-2">
-                </div>
-
-                <!-- Live TSE URL Endpoint -->
-                <div id="tse-controls" class="hidden md:col-span-2 space-y-2">
-                    <label class="text-xs font-medium text-slate-400">URL Endpoint JSON do TSE (Polling Direto)</label>
-                    <div class="flex gap-2">
-                        <input id="tse-url-input" type="text" placeholder="https://resultados.tse.jus.br/oficial/ele2026/..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500">
-                        <button onclick="fetchTSEData()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-lg font-medium transition">Consultar</button>
-                    </div>
-                    <p class="text-[11px] text-slate-500">O sistema recalcula automaticamente o modelo Bayesiano a cada atualização recebida da API.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- TOP SECTION: CANDIDATES CARD -->
-        <section class="grid grid-cols-2 gap-3 md:gap-6">
-            <!-- Candidate 1: Lula (Red) -->
-            <div id="card-lula" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-6 flex flex-col items-center text-center relative overflow-hidden transition-all duration-300">
-                <div class="absolute -top-12 -left-12 w-32 h-32 bg-red-600/10 rounded-full blur-2xl"></div>
-                
-                <div class="relative mb-3">
-                    <img src="https://unavatar.io/twitter/LulaOficial?fallback=https://placehold.co/150x150/dc2626/ffffff?text=LULA" 
-                         alt="Lula" 
-                         onerror="this.src='https://placehold.co/150x150/dc2626/ffffff?text=LULA'" 
-                         class="w-20 h-20 md:w-28 md:h-28 rounded-full object-cover border-4 border-red-600/80 shadow-lg shadow-red-900/20">
-                    <span class="absolute bottom-0 right-0 bg-red-600 text-white text-[10px] md:text-xs font-extrabold px-2 py-0.5 rounded-full border border-slate-900">
-                        PT
-                    </span>
-                </div>
-
-                <h2 class="font-bold text-lg md:text-2xl text-white tracking-tight">Lula</h2>
-                <div class="mt-1">
-                    <span id="lula-votes" class="text-xl md:text-3xl font-extrabold text-red-500 tracking-tight font-mono">0</span>
-                    <span class="block text-[11px] md:text-xs text-slate-400 font-medium">votos válidos</span>
-                </div>
-            </div>
-
-            <!-- Candidate 2: Flávio Bolsonaro (Blue) -->
-            <div id="card-flavio" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 md:p-6 flex flex-col items-center text-center relative overflow-hidden transition-all duration-300">
-                <div class="absolute -top-12 -right-12 w-32 h-32 bg-blue-600/10 rounded-full blur-2xl"></div>
-                
-                <div class="relative mb-3">
-                    <img src="https://unavatar.io/twitter/FlavioBolsonaro?fallback=https://placehold.co/150x150/2563eb/ffffff?text=FLAVIO" 
-                         alt="Flávio Bolsonaro" 
-                         onerror="this.src='https://placehold.co/150x150/2563eb/ffffff?text=FLAVIO'" 
-                         class="w-20 h-20 md:w-28 md:h-28 rounded-full object-cover border-4 border-blue-600/80 shadow-lg shadow-blue-900/20">
-                    <span class="absolute bottom-0 right-0 bg-blue-600 text-white text-[10px] md:text-xs font-extrabold px-2 py-0.5 rounded-full border border-slate-900">
-                        PL
-                    </span>
-                </div>
-
-                <h2 class="font-bold text-lg md:text-2xl text-white tracking-tight">Flávio Bolsonaro</h2>
-                <div class="mt-1">
-                    <span id="flavio-votes" class="text-xl md:text-3xl font-extrabold text-blue-500 tracking-tight font-mono">0</span>
-                    <span class="block text-[11px] md:text-xs text-slate-400 font-medium">votos válidos</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- VISUAL ENGINE BARS SECTION -->
-        <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-6 space-y-6 backdrop-blur">
-            
-            <!-- BAR 1: Percentual de Votos Apurados (Chess Engine Style) -->
-            <div class="space-y-2">
-                <div class="flex justify-between items-center text-xs md:text-sm font-semibold">
-                    <span class="text-red-400 flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-red-600 inline-block"></span>
-                        Lula: <span id="lula-pct-text" class="font-mono text-white text-sm md:text-base ml-1">50.00%</span>
-                    </span>
-                    <span class="text-xs text-slate-400 font-normal uppercase tracking-wider">Votos Apurados</span>
-                    <span class="text-blue-400 flex items-center gap-1.5">
-                        <span id="flavio-pct-text" class="font-mono text-white text-sm md:text-base mr-1">50.00%</span> :Flávio
-                        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
-                    </span>
-                </div>
-                
-                <!-- Dual Progress Bar -->
-                <div class="h-9 md:h-11 w-full bg-slate-950 rounded-xl overflow-hidden p-1 flex border border-slate-800 relative shadow-inner">
-                    <div id="bar-votos-lula" class="h-full bg-gradient-to-r from-red-700 to-red-600 rounded-l-lg bar-transition flex items-center justify-start px-3 text-xs font-bold text-white" style="width: 50%;">
-                        <span id="bar-lula-label" class="truncate">50.0%</span>
-                    </div>
-                    <div id="bar-votos-flavio" class="h-full bg-gradient-to-r from-blue-600 to-blue-700 rounded-r-lg bar-transition flex items-center justify-end px-3 text-xs font-bold text-white" style="width: 50%;">
-                        <span id="bar-flavio-label" class="truncate">50.0%</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- BAR 2: Bayesian Win Probability -->
-            <div class="space-y-2 pt-2 border-t border-slate-800/80">
-                <div class="flex justify-between items-center text-xs md:text-sm font-semibold">
-                    <span class="text-red-400 flex items-center gap-1">
-                        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
-                        Chance de Vitória: <span id="lula-prob-text" class="font-mono text-white text-sm md:text-base ml-1">50.0%</span>
-                    </span>
-                    <span class="text-xs text-amber-400 font-mono uppercase tracking-wider flex items-center gap-1">
-                        <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i> Probabilidade Bayesiana
-                    </span>
-                    <span class="text-blue-400 flex items-center gap-1">
-                        Chance de Vitória: <span id="flavio-prob-text" class="font-mono text-white text-sm md:text-base mr-1">50.0%</span>
-                        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
-                    </span>
-                </div>
-
-                <!-- Probability Dual Bar -->
-                <div class="h-9 md:h-11 w-full bg-slate-950 rounded-xl overflow-hidden p-1 flex border border-slate-800 relative shadow-inner">
-                    <div id="bar-prob-lula" class="h-full bg-red-600 rounded-l-lg bar-transition flex items-center justify-start px-3 text-xs font-extrabold text-white shadow-[0_0_12px_rgba(220,38,38,0.5)]" style="width: 50%;">
-                        <span id="prob-lula-label" class="truncate">50% CHANCE</span>
-                    </div>
-                    <div id="bar-prob-flavio" class="h-full bg-blue-600 rounded-r-lg bar-transition flex items-center justify-end px-3 text-xs font-extrabold text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]" style="width: 50%;">
-                        <span id="prob-flavio-label" class="truncate">50% CHANCE</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- BAR 3: Total Progress (Black to White) -->
-            <div class="space-y-2 pt-2 border-t border-slate-800/80">
-                <div class="flex justify-between items-center text-xs font-medium text-slate-400">
-                    <span class="flex items-center gap-1.5 text-slate-300">
-                        <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-slate-400"></i>
-                        Progresso Nacional da Apuração
-                    </span>
-                    <span id="total-progress-text" class="font-mono text-white font-bold">0.00%</span>
-                </div>
-
-                <!-- Black to White Progress Bar -->
-                <div class="h-6 w-full bg-black rounded-lg p-0.5 border border-slate-800 overflow-hidden shadow-inner">
-                    <div id="bar-total-progress" class="h-full bg-white rounded-md bar-transition" style="width: 0%;"></div>
-                </div>
-                <div class="flex justify-between text-[10px] text-slate-500 font-mono">
-                    <span>0% (Urnas Fechadas)</span>
-                    <span id="total-urnas-status">0 de 156.454.011 eleitores</span>
-                    <span>100% (Concluído)</span>
-                </div>
-            </div>
-
-            <!-- BAR 4: Valid vs Invalid/Abstentions (Green & Yellow) -->
-            <div class="space-y-2 pt-2 border-t border-slate-800/80">
-                <div class="flex justify-between items-center text-xs font-medium">
-                    <span class="text-emerald-400 flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
-                        Votos Válidos: <span id="valid-pct-text" class="font-mono text-white font-bold ml-1">0.0%</span>
-                    </span>
-                    <span class="text-amber-400 flex items-center gap-1.5">
-                        Nulos / Brancos / Abstenções: <span id="invalid-pct-text" class="font-mono text-white font-bold ml-1">0.0%</span>
-                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
-                    </span>
-                </div>
-
-                <!-- Green / Yellow Bar -->
-                <div class="h-6 w-full bg-slate-950 rounded-lg p-0.5 border border-slate-800 flex overflow-hidden shadow-inner">
-                    <div id="bar-valid-votes" class="h-full bg-emerald-600 rounded-l-md bar-transition" style="width: 80%;"></div>
-                    <div id="bar-invalid-votes" class="h-full bg-amber-500 rounded-r-md bar-transition" style="width: 20%;"></div>
-                </div>
-                <div class="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Válidos: <strong id="valid-count" class="text-slate-200">0</strong></span>
-                    <span>Inválidos + Abstenções: <strong id="invalid-count" class="text-slate-200">0</strong></span>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- EXTRA REQUIREMENT: RANKING TOP 5 ESTADOS COM MAIS VOTOS A APURAR -->
-        <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 md:p-6 space-y-4">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                <div>
-                    <h3 class="font-bold text-base md:text-lg text-white flex items-center gap-2">
-                        <i data-lucide="map-pin" class="w-5 h-5 text-amber-400"></i>
-                        Top 5 Estados com Mais Votos Pendentes
-                    </h3>
-                    <p class="text-xs text-slate-400">Ranking em tempo real das UFs com maior volume de votos em quantidade absoluta ainda a apurar</p>
-                </div>
-                <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700 self-start md:self-auto font-mono">
-                    Ordenado por: Votos Pendentes (Absoluto)
-                </span>
-            </div>
-
-            <!-- Ranking List Container -->
-            <div id="top5-states-list" class="grid grid-cols-1 gap-3">
-                <!-- Dynamic cards populated by JavaScript -->
-            </div>
-        </section>
-
-        <!-- LIVE CONTROLS & STATUS -->
-        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <button id="btn-play-pause" onclick="toggleApuração()" class="bg-emerald-600 hover:bg-emerald-500 text-white p-3 rounded-xl flex items-center justify-center transition shadow-lg shadow-emerald-900/30">
-                    <i id="play-icon" data-lucide="play" class="w-5 h-5 fill-current"></i>
-                </button>
-                <button onclick="resetApuração()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-3 rounded-xl flex items-center justify-center border border-slate-700 transition" title="Reiniciar Apuração">
-                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
-                </button>
-                <div>
-                    <h4 class="text-xs font-semibold text-slate-200">Alimentador da Apuração ao Vivo</h4>
-                    <p id="sim-status-text" class="text-[11px] text-slate-400">Apuração Pausada</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-4 text-xs font-mono text-slate-400 bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
-                <div>
-                    <span class="block text-[10px] text-slate-500 uppercase">Eleitorado Nacional</span>
-                    <span class="text-slate-200 font-bold">156.454.011</span>
-                </div>
-                <div class="h-6 w-[1px] bg-slate-800"></div>
-                <div>
-                    <span class="block text-[10px] text-slate-500 uppercase">Ritmo de Apuração</span>
-                    <span id="urnas-rate" class="text-blue-400 font-bold">0 votos/s</span>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="max-w-6xl mx-auto w-full px-4 mt-8 text-center text-xs text-slate-500">
-        <p>Modelo Estatístico Bayesiano com Viés Regional por Estado em Tempo Real.</p>
-        <p class="mt-1">Desenvolvido para Deploy Direto no GitHub Pages.</p>
-    </footer>
-
-    <!-- SCRIPT LOGIC -->
-    <script>
-        // --- ELECTION STATE & STATE LEVEL DATA (27 UFs) ---
-        // Voter electorate distribution per state (Real approximate election counts)
-        const STATES_DATA = [
-            { uf: 'SP', name: 'São Paulo', voters: 34642972, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.44 },
-            { uf: 'MG', name: 'Minas Gerais', voters: 16290870, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.505 },
-            { uf: 'RJ', name: 'Rio de Janeiro', voters: 12827296, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.43 },
-            { uf: 'BA', name: 'Bahia', voters: 11291528, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.72 },
-            { uf: 'RS', name: 'Rio Grande do Sul', voters: 8593467, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.43 },
-            { uf: 'PR', name: 'Paraná', voters: 8475632, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.38 },
-            { uf: 'PE', name: 'Pernambuco', voters: 7018098, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.67 },
-            { uf: 'CE', name: 'Ceará', voters: 6809638, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.69 },
-            { uf: 'PA', name: 'Pará', voters: 6069678, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.54 },
-            { uf: 'SC', name: 'Santa Catarina', voters: 5489658, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.31 },
-            { uf: 'MA', name: 'Maranhão', voters: 5042999, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.71 },
-            { uf: 'GO', name: 'Goiás', voters: 4870354, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.41 },
-            { uf: 'PB', name: 'Paraíba', voters: 3091684, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.66 },
-            { uf: 'AM', name: 'Amazonas', voters: 2647039, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.51 },
-            { uf: 'ES', name: 'Espírito Santo', voters: 2921506, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.42 },
-            { uf: 'RN', name: 'Rio Grande do Norte', voters: 2554727, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.65 },
-            { uf: 'AL', name: 'Alagoas', voters: 2325656, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.58 },
-            { uf: 'PI', name: 'Piauí', voters: 2573809, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.74 },
-            { uf: 'MT', name: 'Mato Grosso', voters: 2469414, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.35 },
-            { uf: 'MS', name: 'Mato Grosso do Sul', voters: 1996315, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.40 },
-            { uf: 'DF', name: 'Distrito Federal', voters: 2203045, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.42 },
-            { uf: 'SE', name: 'Sergipe', voters: 1671801, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.67 },
-            { uf: 'RO', name: 'Rondônia', voters: 1237416, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.30 },
-            { uf: 'TO', name: 'Tocantins', voters: 1094003, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.50 },
-            { uf: 'AC', name: 'Acre', voters: 588433, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.29 },
-            { uf: 'AP', name: 'Amapá', voters: 550684, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.48 },
-            { uf: 'RR', name: 'Roraima', voters: 366240, counted: 0, lulaValid: 0, flavioValid: 0, invalid: 0, lulaBias: 0.23 }
-        ];
-
-        const TOTAL_NATIONAL_VOTERS = STATES_DATA.reduce((acc, cur) => acc + cur.voters, 0);
-
-        let globalState = {
-            isRunning: false,
-            mode: 'sim',
-            lulaVotes: 0,
-            flavioVotes: 0,
-            validVotes: 0,
-            invalidVotes: 0,
-            totalCounted: 0,
-            lulaProb: 0.50,
-            flavioProb: 0.50,
-            speedMultiplier: 1.0,
-            intervalId: null
-        };
-
-        // Prior variance for Bayesian calculation
-        const PRIOR_LULA_MEAN = 0.508;
-        const PRIOR_VARIANCE = 0.022;
-
-        lucide.createIcons();
-
-        // --- APURAÇÃO LOOP ENGINE ---
-
-        function toggleApuração() {
-            globalState.isRunning = !globalState.isRunning;
-            const playIcon = document.getElementById('play-icon');
-            const statusText = document.getElementById('sim-status-text');
-
-            if (globalState.isRunning) {
-                playIcon.setAttribute('data-lucide', 'pause');
-                statusText.innerText = "Recebendo Votos em Tempo Real...";
-                statusText.className = "text-[11px] text-emerald-400 font-medium animate-pulse";
-                startApuraçãoLoop();
-            } else {
-                playIcon.setAttribute('data-lucide', 'play');
-                statusText.innerText = "Apuração Pausada";
-                statusText.className = "text-[11px] text-slate-400";
-                stopApuraçãoLoop();
-            }
-            lucide.createIcons();
-        }
-
-        function resetApuração() {
-            stopApuraçãoLoop();
-            globalState.isRunning = false;
-            globalState.totalCounted = 0;
-            globalState.lulaVotes = 0;
-            globalState.flavioVotes = 0;
-            globalState.validVotes = 0;
-            globalState.invalidVotes = 0;
-            globalState.lulaProb = 0.50;
-            globalState.flavioProb = 0.50;
-
-            // Reset all state data
-            STATES_DATA.forEach(st => {
-                st.counted = 0;
-                st.lulaValid = 0;
-                st.flavioValid = 0;
-                st.invalid = 0;
-            });
-
-            document.getElementById('play-icon').setAttribute('data-lucide', 'play');
-            document.getElementById('sim-status-text').innerText = "Apuração Reiniciada";
-            document.getElementById('sim-status-text').className = "text-[11px] text-slate-400";
-            
-            updateUI();
-            lucide.createIcons();
-        }
-
-        function startApuraçãoLoop() {
-            stopApuraçãoLoop();
-            globalState.intervalId = setInterval(() => {
-                if (globalState.totalCounted >= TOTAL_NATIONAL_VOTERS) {
-                    globalState.totalCounted = TOTAL_NATIONAL_VOTERS;
-                    toggleApuração();
-                    document.getElementById('sim-status-text').innerText = "Apuração 100% Concluída";
-                    return;
-                }
-
-                // Feed incremental votes into states with variable speed across regions
-                // Simulates uneven counting speeds (e.g., South/Southeast starts faster, Northeast capilarizes later)
-                const baseVoteBatch = 180000 * globalState.speedMultiplier;
-                
-                STATES_DATA.forEach(st => {
-                    if (st.counted < st.voters) {
-                        // Regional counting speed factor
-                        let speedFactor = 1.0;
-                        const currentPct = st.counted / st.voters;
-                        if (['SP', 'RJ', 'PR', 'SC', 'RS'].includes(st.uf)) {
-                            speedFactor = currentPct < 0.6 ? 1.4 : 0.8;
-                        } else if (['BA', 'MA', 'PI', 'CE', 'PA'].includes(st.uf)) {
-                            speedFactor = currentPct < 0.3 ? 0.6 : 1.3;
-                        }
-
-                        const increment = Math.min(
-                            st.voters - st.counted, 
-                            Math.floor((st.voters / TOTAL_NATIONAL_VOTERS) * baseVoteBatch * speedFactor * (0.8 + Math.random() * 0.4))
-                        );
-
-                        if (increment > 0) {
-                            st.counted += increment;
-
-                            // 20.5% invalid/abstention rate
-                            const validInc = Math.floor(increment * 0.795);
-                            const invalidInc = increment - validInc;
-                            st.invalid += invalidInc;
-
-                            // Lula vs Flavio share for this state increment
-                            const noise = (Math.random() - 0.5) * 0.03;
-                            const lulaShare = Math.min(0.9, Math.max(0.1, st.lulaBias + noise));
-
-                            const lulaInc = Math.floor(validInc * lulaShare);
-                            const flavioInc = validInc - lulaInc;
-
-                            st.lulaValid += lulaInc;
-                            st.flavioValid += flavioInc;
-                        }
-                    }
-                });
-
-                // Re-aggregate national totals from state states
-                aggregateNationalTotals();
-
-                // Compute Live Bayesian Probability
-                calculateBayesianProbability();
-
-                updateUI();
-            }, 100);
-        }
-
-        function stopApuraçãoLoop() {
-            if (globalState.intervalId) {
-                clearInterval(globalState.intervalId);
-                globalState.intervalId = null;
-            }
-        }
-
-        function aggregateNationalTotals() {
-            let lula = 0, flavio = 0, invalid = 0, total = 0;
-            STATES_DATA.forEach(st => {
-                lula += st.lulaValid;
-                flavio += st.flavioValid;
-                invalid += st.invalid;
-                total += st.counted;
-            });
-
-            globalState.lulaVotes = lula;
-            globalState.flavioVotes = flavio;
-            globalState.validVotes = lula + flavio;
-            globalState.invalidVotes = invalid;
-            globalState.totalCounted = total;
-        }
-
-        // --- BAYESIAN WIN PROBABILITY ENGINE ---
-        function calculateBayesianProbability() {
-            const nationalProgress = globalState.totalCounted / TOTAL_NATIONAL_VOTERS;
-
-            if (nationalProgress <= 0.001) {
-                globalState.lulaProb = 0.50;
-                globalState.flavioProb = 0.50;
-                return;
-            }
-
-            // Calculate expected votes from remaining uncounted states
-            let expectedUncountedLulaVotes = 0;
-            let expectedUncountedValidVotes = 0;
-
-            STATES_DATA.forEach(st => {
-                const uncountedVoters = st.voters - st.counted;
-                if (uncountedVoters > 0) {
-                    const expectedValid = uncountedVoters * 0.795;
-                    // Observed state ratio or prior bias if low count
-                    const stateProgress = st.counted / st.voters;
-                    const currentObservedRatio = (st.lulaValid + st.flavioValid) > 0 
-                        ? (st.lulaValid / (st.lulaValid + st.flavioValid)) 
-                        : st.lulaBias;
-                    
-                    // Weight observed state data vs prior
-                    const lulaRatioEst = (currentObservedRatio * stateProgress) + (st.lulaBias * (1 - stateProgress));
-                    
-                    expectedUncountedLulaVotes += expectedValid * lulaRatioEst;
-                    expectedUncountedValidVotes += expectedValid;
-                }
-            });
-
-            const totalProjectedValid = globalState.validVotes + expectedUncountedValidVotes;
-            const projectedLulaShare = (globalState.lulaVotes + expectedUncountedLulaVotes) / totalProjectedValid;
-
-            // Variance shrinks as progress approaches 1.0
-            const uncountedWeight = 1 - nationalProgress;
-            const currentVariance = PRIOR_VARIANCE * Math.pow(uncountedWeight, 1.9);
-
-            if (currentVariance < 0.000005) {
-                globalState.lulaProb = projectedLulaShare > 0.5 ? 1.0 : 0.0;
-            } else {
-                const z = (projectedLulaShare - 0.50) / Math.sqrt(currentVariance);
-                globalState.lulaProb = normalCDF(z);
-            }
-
-            globalState.flavioProb = 1 - globalState.lulaProb;
-        }
-
-        function normalCDF(x) {
-            const t = 1 / (1 + 0.2316419 * Math.abs(x));
-            const d = 0.3989423 * Math.exp(-x * x / 2);
-            let prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-            if (x > 0) prob = 1 - prob;
-            return prob;
-        }
-
-        // --- UI RENDER ROUTINE ---
-        function updateUI() {
-            const formatNum = num => num.toLocaleString('pt-BR');
-
-            // 1. Candidate Totals
-            document.getElementById('lula-votes').innerText = formatNum(globalState.lulaVotes);
-            document.getElementById('flavio-votes').innerText = formatNum(globalState.flavioVotes);
-
-            // Percentages
-            const totalValid = globalState.lulaVotes + globalState.flavioVotes;
-            const lulaPct = totalValid > 0 ? (globalState.lulaVotes / totalValid) * 100 : 50.0;
-            const flavioPct = totalValid > 0 ? (globalState.flavioVotes / totalValid) * 100 : 50.0;
-
-            document.getElementById('lula-pct-text').innerText = `${lulaPct.toFixed(2)}%`;
-            document.getElementById('flavio-pct-text').innerText = `${flavioPct.toFixed(2)}%`;
-
-            // BAR 1: Chess Engine Vote Bar
-            const barLula = document.getElementById('bar-votos-lula');
-            const barFlavio = document.getElementById('bar-votos-flavio');
-            barLula.style.width = `${lulaPct}%`;
-            barFlavio.style.width = `${flavioPct}%`;
-            document.getElementById('bar-lula-label').innerText = `${lulaPct.toFixed(1)}%`;
-            document.getElementById('bar-flavio-label').innerText = `${flavioPct.toFixed(1)}%`;
-
-            // BAR 2: Bayesian Win Probability Bar
-            const lulaProbPct = (globalState.lulaProb * 100).toFixed(1);
-            const flavioProbPct = (globalState.flavioProb * 100).toFixed(1);
-
-            document.getElementById('lula-prob-text').innerText = `${lulaProbPct}%`;
-            document.getElementById('flavio-prob-text').innerText = `${flavioProbPct}%`;
-
-            const barProbLula = document.getElementById('bar-prob-lula');
-            const barProbFlavio = document.getElementById('bar-prob-flavio');
-            barProbLula.style.width = `${lulaProbPct}%`;
-            barProbFlavio.style.width = `${flavioProbPct}%`;
-            document.getElementById('prob-lula-label').innerText = `${lulaProbPct}% CHANCE`;
-            document.getElementById('prob-flavio-label').innerText = `${flavioProbPct}% CHANCE`;
-
-            // Candidate Cards Highlight
-            const cardLula = document.getElementById('card-lula');
-            const cardFlavio = document.getElementById('card-flavio');
-            if (globalState.lulaProb > 0.65) {
-                cardLula.classList.add('glow-red', 'border-red-500/50');
-                cardFlavio.classList.remove('glow-blue', 'border-blue-500/50');
-            } else if (globalState.flavioProb > 0.65) {
-                cardFlavio.classList.add('glow-blue', 'border-blue-500/50');
-                cardLula.classList.remove('glow-red', 'border-red-500/50');
-            } else {
-                cardLula.classList.remove('glow-red', 'border-red-500/50');
-                cardFlavio.classList.remove('glow-blue', 'border-blue-500/50');
-            }
-
-            // BAR 3: Total Progress Bar (Black to White)
-            const nationalProgressPct = (globalState.totalCounted / TOTAL_NATIONAL_VOTERS) * 100;
-            document.getElementById('total-progress-text').innerText = `${nationalProgressPct.toFixed(2)}%`;
-            document.getElementById('bar-total-progress').style.width = `${nationalProgressPct}%`;
-            document.getElementById('total-urnas-status').innerText = `${formatNum(globalState.totalCounted)} de ${formatNum(TOTAL_NATIONAL_VOTERS)} eleitores`;
-
-            // BAR 4: Valid vs Invalid Bar
-            const processedTotal = globalState.validVotes + globalState.invalidVotes;
-            const validPct = processedTotal > 0 ? (globalState.validVotes / processedTotal) * 100 : 0;
-            const invalidPct = processedTotal > 0 ? (globalState.invalidVotes / processedTotal) * 100 : 0;
-
-            document.getElementById('valid-pct-text').innerText = `${validPct.toFixed(1)}%`;
-            document.getElementById('invalid-pct-text').innerText = `${invalidPct.toFixed(1)}%`;
-            document.getElementById('bar-valid-votes').style.width = `${validPct}%`;
-            document.getElementById('bar-invalid-votes').style.width = `${invalidPct}%`;
-
-            document.getElementById('valid-count').innerText = formatNum(globalState.validVotes);
-            document.getElementById('invalid-count').innerText = formatNum(globalState.invalidVotes);
-
-            // Rate Display
-            const votesPerSec = Math.floor(180000 * globalState.speedMultiplier);
-            document.getElementById('urnas-rate').innerText = globalState.isRunning ? `~${formatNum(votesPerSec)} votos/s` : `0 votos/s`;
-
-            // 5. RENDER RANKING TOP 5 ESTADOS COM MAIS VOTOS A APURAR
-            renderTop5PendingStates();
-        }
-
-        // --- TOP 5 PENDING STATES RANKING RENDER ---
-        function renderTop5PendingStates() {
-            const formatNum = num => num.toLocaleString('pt-BR');
-
-            // Compute pending votes per state and sort descending by absolute pending quantity
-            const sortedStates = [...STATES_DATA].map(st => {
-                const pendingVotes = st.voters - st.counted;
-                const stateValidTotal = st.lulaValid + st.flavioValid;
-                const lulaStatePct = stateValidTotal > 0 ? (st.lulaValid / stateValidTotal) * 100 : (st.lulaBias * 100);
-                const flavioStatePct = stateValidTotal > 0 ? (st.flavioValid / stateValidTotal) * 100 : ((1 - st.lulaBias) * 100);
-                
-                const validStatePct = st.counted > 0 ? (stateValidTotal / st.counted) * 100 : 79.5;
-                const invalidStatePct = st.counted > 0 ? (st.invalid / st.counted) * 100 : 20.5;
-
-                return {
-                    ...st,
-                    pendingVotes,
-                    lulaStatePct,
-                    flavioStatePct,
-                    validStatePct,
-                    invalidStatePct
-                };
-            }).sort((a, b) => b.pendingVotes - a.pendingVotes);
-
-            const top5 = sortedStates.slice(0, 5);
-            const container = document.getElementById('top5-states-list');
-
-            container.innerHTML = top5.map((st, index) => `
-                <div class="bg-slate-950 border border-slate-800/90 rounded-xl p-3 md:p-4 space-y-3 transition hover:border-slate-700">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="flex items-center gap-2.5">
-                            <span class="w-6 h-6 rounded-full bg-slate-800 text-amber-400 border border-slate-700 text-xs font-bold flex items-center justify-center font-mono">
-                                ${index + 1}
-                            </span>
-                            <span class="font-bold text-sm md:text-base text-white">${st.name} (${st.uf})</span>
-                        </div>
-                        <div class="text-right font-mono">
-                            <span class="text-xs md:text-sm font-extrabold text-amber-400">${formatNum(st.pendingVotes)}</span>
-                            <span class="text-[10px] text-slate-500 block">votos a apurar (faltantes)</span>
-                        </div>
-                    </div>
-
-                    <!-- State Sub-bars Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t border-slate-900">
-                        <!-- Left: Lula vs Flavio in State -->
-                        <div class="space-y-1">
-                            <div class="flex justify-between text-[11px] font-mono">
-                                <span class="text-red-400">Lula: ${st.lulaStatePct.toFixed(1)}%</span>
-                                <span class="text-slate-400 text-[10px]">Votos Válidos UF</span>
-                                <span class="text-blue-400">Flávio: ${st.flavioStatePct.toFixed(1)}%</span>
-                            </div>
-                            <div class="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex border border-slate-800">
-                                <div class="h-full bg-red-600 rounded-l-full bar-transition" style="width: ${st.lulaStatePct}%"></div>
-                                <div class="h-full bg-blue-600 rounded-r-full bar-transition" style="width: ${st.flavioStatePct}%"></div>
-                            </div>
-                        </div>
-
-                        <!-- Right: Valid vs Invalid/Abstention in State -->
-                        <div class="space-y-1">
-                            <div class="flex justify-between text-[11px] font-mono">
-                                <span class="text-emerald-400">Válidos: ${st.validStatePct.toFixed(1)}%</span>
-                                <span class="text-slate-400 text-[10px]">Total UF</span>
-                                <span class="text-amber-400">Abst/Nulo/Br: ${st.invalidStatePct.toFixed(1)}%</span>
-                            </div>
-                            <div class="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex border border-slate-800">
-                                <div class="h-full bg-emerald-600 rounded-l-full bar-transition" style="width: ${st.validStatePct}%"></div>
-                                <div class="h-full bg-amber-500 rounded-r-full bar-transition" style="width: ${st.invalidStatePct}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // --- CONTROLS & EVENT LISTENERS ---
-        document.getElementById('sim-speed').addEventListener('input', (e) => {
-            globalState.speedMultiplier = parseFloat(e.target.value);
-            document.getElementById('speed-val').innerText = `${globalState.speedMultiplier.toFixed(1)}x`;
-            if (globalState.isRunning) startApuraçãoLoop();
-        });
-
-        document.getElementById('btn-toggle-config').addEventListener('click', () => {
-            const panel = document.getElementById('config-panel');
-            panel.classList.toggle('hidden');
-        });
-
-        function setMode(mode) {
-            globalState.mode = mode;
-            const btnSim = document.getElementById('mode-sim');
-            const btnTse = document.getElementById('mode-tse');
-            const simControls = document.getElementById('sim-controls');
-            const tseControls = document.getElementById('tse-controls');
-            const badge = document.getElementById('data-source-badge');
-
-            if (mode === 'sim') {
-                btnSim.className = "py-2 px-3 text-xs font-medium rounded-md bg-slate-800 text-white shadow";
-                btnTse.className = "py-2 px-3 text-xs font-medium rounded-md text-slate-400 hover:text-white";
-                simControls.classList.remove('hidden');
-                tseControls.classList.add('hidden');
-                badge.innerText = "Feed Dinâmico Ao Vivo";
-                badge.className = "text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium";
-            } else {
-                btnTse.className = "py-2 px-3 text-xs font-medium rounded-md bg-slate-800 text-white shadow";
-                btnSim.className = "py-2 px-3 text-xs font-medium rounded-md text-slate-400 hover:text-white";
-                simControls.classList.add('hidden');
-                tseControls.classList.remove('hidden');
-                badge.innerText = "Modo API Externo";
-                badge.className = "text-xs px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium";
-                stopApuraçãoLoop();
-            }
-        }
-
-        async function fetchTSEData() {
-            const url = document.getElementById('tse-url-input').value.trim();
-            if (!url) {
-                alert('Insira uma URL válida do JSON de apuração do TSE.');
-                return;
-            }
-
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                if (data && data.cand) {
-                    const lulaData = data.cand.find(c => c.nm && c.nm.toLowerCase().includes('lula')) || data.cand[0];
-                    const flavioData = data.cand.find(c => c.nm && c.nm.toLowerCase().includes('flavio')) || data.cand[1];
-
-                    globalState.lulaVotes = parseInt(lulaData.vap || 0);
-                    globalState.flavioVotes = parseInt(flavioData.vap || 0);
-                    globalState.validVotes = globalState.lulaVotes + globalState.flavioVotes;
-                    globalState.totalCounted = Math.floor(TOTAL_NATIONAL_VOTERS * (parseFloat(data.pst || 50) / 100));
-                    
-                    calculateBayesianProbability();
-                    updateUI();
-                }
-            } catch (err) {
-                console.error("Erro ao conectar à API:", err);
-                alert("Falha ao buscar dados. Verifique o endpoint JSON ou eventuais restrições de CORS.");
-            }
-        }
-
-        // Initial render
-        updateUI();
-    </script>
+        <div class="bar-container">
+          <div class="bar-votes-lula" id="bar-votes-lula" style="width: 50%;"></div>
+          <div class="bar-votes-flavio" id="bar-votes-flavio" style="width: 50%;"></div>
+        </div>
+      </div>
+
+      <!-- Barra 2: Chance de Vitória -->
+      <div class="bar-group">
+        <div class="bar-label">
+          <span id="label-prob-lula">Chance Lula: 50.0%</span>
+          <span id="label-prob-flavio">Chance Flávio: 50.0%</span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-prob-lula" id="bar-prob-lula" style="width: 50%;"></div>
+          <div class="bar-prob-flavio" id="bar-prob-flavio" style="width: 50%;"></div>
+        </div>
+      </div>
+
+      <!-- Barra 3: Progresso da Apuração -->
+      <div class="bar-group">
+        <div class="bar-label">
+          <span>Progresso da Apuração</span>
+          <span id="label-progress">0.00% Apurado</span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-progress-filled" id="bar-progress" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Barra 4: Válidos x Nulos/Brancos/Abstenções -->
+      <div class="bar-group">
+        <div class="bar-label">
+          <span id="label-valid">Válidos: 0%</span>
+          <span id="label-invalid">Nulos/Brancos/Abst.: 0%</span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-valid" id="bar-valid" style="width: 100%;"></div>
+          <div class="bar-invalid" id="bar-invalid" style="width: 0%;"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Ranking dos 5 Estados com mais Votos Pendentes -->
+    <div class="ranking-section">
+      <div class="ranking-title">Top 5 Estados com Mais Votos a Apurar</div>
+      <div id="ranking-list">
+        <!-- Renderizado dinamicamente via JS -->
+      </div>
+    </div>
+
+    <!-- Rodapé -->
+    <div class="footer-status">
+      <div id="last-update">Última atualização: Carregando...</div>
+      <div class="disclaimer">
+        * Este site é apenas experimental. Para informações oficiais, consulte fontes sérias e os canais do TSE.
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // URL do endpoint de dados do TSE
+    const TSE_API_URL = "https://resultados.tse.jus.br/oficial/ele2022/545/dados-simplificados/br/br-c0001-e000545-r.json";
+
+    async function buscarDadosEAtualizar() {
+      try {
+        const response = await fetch(TSE_API_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error("Erro na rede ou API indisponível");
+        const data = await response.json();
+
+        processarDados(data);
+      } catch (error) {
+        console.warn("Não foi possível carregar dados reais do TSE no momento.", error);
+        document.getElementById('last-update').innerText = "Aguardando transmissão de dados oficiais do TSE...";
+      }
+    }
+
+    function processarDados(data) {
+      // 1. Extração de candidatos
+      const candLula = data.cand.find(c => c.seq === "1") || { vap: "0", pvap: "0.00" };
+      const candFlavio = data.cand.find(c => c.seq === "2") || { vap: "0", pvap: "0.00" };
+
+      const vLula = parseInt(candLula.vap, 10) || 0;
+      const vFlavio = parseInt(candFlavio.vap, 10) || 0;
+      const totalValidos = vLula + vFlavio;
+
+      const pctLula = totalValidos > 0 ? (vLula / totalValidos) * 100 : 0;
+      const pctFlavio = totalValidos > 0 ? (vFlavio / totalValidos) * 100 : 0;
+
+      // Atualiza interface - Candidatos
+      document.getElementById('votes-lula').innerText = `${vLula.toLocaleString('pt-BR')} votos`;
+      document.getElementById('pct-lula').innerText = `${pctLula.toFixed(2)}%`;
+      document.getElementById('votes-flavio').innerText = `${vFlavio.toLocaleString('pt-BR')} votos`;
+      document.getElementById('pct-flavio').innerText = `${pctFlavio.toFixed(2)}%`;
+
+      // Barra 1: Percentual de Votos
+      document.getElementById('bar-votes-lula').style.width = `${pctLula}%`;
+      document.getElementById('bar-votes-flavio').style.width = `${pctFlavio}%`;
+
+      // 2. Progresso da apuração e votos faltantes
+      const pctApurado = parseFloat(data.pst) || 0;
+      document.getElementById('label-progress').innerText = `${pctApurado.toFixed(2)}% Apurado`;
+      document.getElementById('bar-progress').style.width = `${pctApurado}%`;
+
+      // Estimativa estática de votos pendentes
+      const apuradosFracao = Math.max(pctApurado / 100, 0.001);
+      const totalEstimadoVotos = totalValidos / apuradosFracao;
+      const votosRestantes = Math.max(0, totalEstimadoVotos - totalValidos);
+
+      // 3. Cálculo da Probabilidade de Vitória
+      const probLula = calcularProbabilidadeEstatica(vLula, vFlavio, votosRestantes);
+      const probFlavio = 100 - probLula;
+
+      document.getElementById('bar-prob-lula').style.width = `${probLula}%`;
+      document.getElementById('bar-prob-flavio').style.width = `${probFlavio}%`;
+      document.getElementById('label-prob-lula').innerText = `Chance Lula: ${probLula.toFixed(1)}%`;
+      document.getElementById('label-prob-flavio').innerText = `Chance Flávio: ${probFlavio.toFixed(1)}%`;
+
+      // 4. Barra 4: Válidos x Inválidos/Abstenção
+      const totalAptos = parseInt(data.e, 10) || 1;
+      const nulosBrancosAbst = Math.max(0, (totalAptos * apuradosFracao) - totalValidos);
+      const totalApuradoGeral = totalValidos + nulosBrancosAbst;
+
+      const pctValidos = totalApuradoGeral > 0 ? (totalValidos / totalApuradoGeral) * 100 : 100;
+      const pctInvalidos = 100 - pctValidos;
+
+      document.getElementById('bar-valid').style.width = `${pctValidos}%`;
+      document.getElementById('bar-invalid').style.width = `${pctInvalidos}%`;
+      document.getElementById('label-valid').innerText = `Válidos: ${pctValidos.toFixed(1)}%`;
+      document.getElementById('label-invalid').innerText = `Nulos/Brancos/Abst.: ${pctInvalidos.toFixed(1)}%`;
+
+      // 5. Atualizar timestamp de execução
+      const agora = new Date().toLocaleTimeString('pt-BR');
+      document.getElementById('last-update').innerText = `Última atualização: ${agora} (Auto-refresh a cada 2 min)`;
+    }
+
+    /* 
+       Cálculo Matemático da Probabilidade Estática
+       Mede quantos votos faltam para atingir a maioria (50% + 1) e avalia 
+       as chances com base no saldo acumulado vs. margem pendente.
+    */
+    function calcularProbabilidadeEstatica(vA, vB, votosRestantes) {
+      const totalAtual = vA + vB;
+      if (totalAtual === 0) return 50;
+
+      const metaVitoria = Math.floor((totalAtual + votosRestantes) / 2) + 1;
+
+      if (vA >= metaVitoria) return 100;
+      if (vB >= metaVitoria) return 0;
+
+      const faltamA = metaVitoria - vA;
+      const proporcaoNecessaria = faltamA / Math.max(1, votosRestantes);
+
+      // Ritmo atual do candidato A
+      const ritmoA = vA / totalAtual;
+
+      // Se o candidato precisa de uma proporção impossível (> 100% dos votos restantes)
+      if (proporcaoNecessaria > 1) return 0;
+      if (proporcaoNecessaria <= 0) return 100;
+
+      // Modelo de Transição Sigmoide baseado no desvio da proporção necessária em relação ao ritmo atual
+      const diferenca = ritmoA - proporcaoNecessaria;
+      const z = diferenca * Math.sqrt(Math.max(1, votosRestantes) / 10000);
+      const prob = 1 / (1 + Math.exp(-z * 3));
+
+      return Math.min(Math.max(prob * 100, 0.1), 99.9);
+    }
+
+    // Executa imediatamente ao abrir e agenda atualização automática a cada 2 minutos (120.000 ms)
+    buscarDadosEAtualizar();
+    setInterval(buscarDadosEAtualizar, 120000);
+  </script>
 </body>
 </html>
