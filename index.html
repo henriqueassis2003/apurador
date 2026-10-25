@@ -393,9 +393,9 @@
     <div class="ranking-section">
       <div class="ranking-title">Ranking ao vivo — 27 UFs com mais votos estimados a apurar</div>
       <div class="ranking-subtitle">
-        Ordenado pela estimativa absoluta de votos ainda a apurar.
+        Ordenado pelo número de eleitores associados às seções ainda não totalizadas, obtido diretamente do campo e.esnt do JSON estadual do TSE.
         Lula e Flávio: percentual dos votos válidos apurados na UF. Válidos, abstenção, brancos e nulos:
-        percentual do eleitorado estadual. Os votos restantes são estimados a partir do eleitorado, do percentual de seções totalizadas e do comparecimento observado.
+        percentual do eleitorado estadual. Eleitores em seções pendentes não significa votos que ainda faltam ser contabilizados.
       </div>
       <div class="table-scroll">
         <table class="uf-table">
@@ -410,7 +410,7 @@
               <th>Brancos (%)</th>
               <th>Nulos (%)</th>
               <th>Apuração (%)</th>
-              <th>Votos a apurar (estim.)</th>
+              <th>Eleitores em seções não totalizadas</th>
             </tr>
           </thead>
           <tbody id="ranking-list">
@@ -499,7 +499,7 @@
         }
       });
 
-      estados.sort((a, b) => b.votosRestantes - a.votosRestantes);
+      estados.sort((a, b) => b.eleitoresNaoTotalizados - a.eleitoresNaoTotalizados);
       if (estados.length) {
         corpo.innerHTML = estados.map((e, i) => `
           <tr>
@@ -512,7 +512,7 @@
             <td>${formatarPct(e.pctBrancos)}</td>
             <td>${formatarPct(e.pctNulos)}</td>
             <td>${formatarPct(e.pctApurado)}</td>
-            <td class="pending-cell">${formatarNumero(e.votosRestantes)}</td>
+            <td class="pending-cell">${formatarNumero(e.eleitoresNaoTotalizados)}</td>
           </tr>
         `).join("");
       } else {
@@ -524,7 +524,7 @@
       const agora = new Date().toLocaleTimeString("pt-BR");
       status.textContent = `UFs carregadas: ${estados.length}/27. Última consulta estadual: ${agora}.` +
         (falhas.length ? ` Sem resposta: ${falhas.join(", ")}.` : "") +
-        " Estimativa de votos restantes = eleitorado estimado nas seções pendentes × taxa de comparecimento observada.";
+        " A coluna final usa diretamente e.esnt (eleitores em seções não totalizadas) do JSON estadual.";
     }
 
     function processarDadosEstado(sigla, nome, data) {
@@ -574,21 +574,21 @@
       const pctBrancos = eleitorado > 0 ? brancos / eleitorado * 100 : 0;
       const pctNulos = eleitorado > 0 ? nulos / eleitorado * 100 : 0;
 
-      // O arquivo agregado não informa exatamente quantos votos faltam em cada UF.
-      // Aproximação: eleitorado proporcional às seções pendentes × taxa de comparecimento
-      // observada nas seções já totalizadas. A estimativa não é uma contagem oficial.
-      const fracaoApurada = Math.min(1, Math.max(0, pctApurado / 100));
-      const eleitoresNasSecoesApuradas = eleitorado * fracaoApurada;
-      const eleitoresRestantes = Math.max(0, eleitorado - eleitoresNasSecoesApuradas);
-      const taxaComparecimento = eleitoresNasSecoesApuradas > 0
-        ? Math.min(1, Math.max(0, comparecimento / eleitoresNasSecoesApuradas))
-        : 0;
-      const votosRestantes = eleitoresRestantes * taxaComparecimento;
+      // Campo oficial do JSON estadual: eleitores associados às seções não totalizadas.
+      // Isso não é uma contagem de votos que ainda faltam; são eleitores vinculados às seções pendentes.
+      // Se e.esnt não vier no arquivo, usamos e.te - e.est quando ambos estão disponíveis.
+      const eleitoresNaoTotalizadosDireto = numero(data.e?.esnt);
+      const eleitoresTotalizadosDireto = numero(data.e?.est);
+      const eleitoresNaoTotalizados = eleitoresNaoTotalizadosDireto !== null
+        ? Math.max(0, eleitoresNaoTotalizadosDireto)
+        : (eleitoresTotalizadosDireto !== null && eleitorado > 0
+            ? Math.max(0, eleitorado - eleitoresTotalizadosDireto)
+            : 0);
 
       return {
         sigla, nome, votosLula, votosFlavio, eleitorado, pctApurado, abstencao, brancos, nulos,
         validosTotal, comparecimento, pctLula, pctFlavio, pctValidosEleitorado,
-        pctAbstencao, pctBrancos, pctNulos, eleitoresRestantes, votosRestantes
+        pctAbstencao, pctBrancos, pctNulos, eleitoresNaoTotalizados
       };
     }
 
